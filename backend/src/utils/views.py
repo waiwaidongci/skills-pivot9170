@@ -3,7 +3,18 @@ from src.utils.time import iso
 
 def dataset(item):
     return {'id': item.id, 'name': item.name, 'filename': item.filename, 'row_count': item.row_count,
-            'checksum': item.checksum, 'author': item.author, 'created_at': iso(item.created_at)}
+            'checksum': item.checksum, 'author': item.author, 'created_at': iso(item.created_at),
+            'archived': item.rows is None, 'archive_status': item.archive_status,
+            'archive_note': item.archive_note, 'archived_at': iso(item.archived_at)}
+
+
+def archive_job(item):
+    dataset = item.dataset if hasattr(item, 'dataset') else None
+    return {'id': item.id, 'dataset_id': item.dataset_id, 'status': item.status,
+            'attempt': item.attempt, 'error': item.error, 'switched': item.switched,
+            'purged': item.purged, 'author': item.author, 'created_at': iso(item.created_at),
+            'updated_at': iso(item.updated_at),
+            'dataset_name': dataset.name if dataset else None}
 
 
 def run(item, detail=False):

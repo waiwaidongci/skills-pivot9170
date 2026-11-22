@@ -89,6 +89,11 @@ def analyze(rows, normalized_params):
     """Return only the publication view used by the result page and CSV exporter."""
     period, threshold = _parameters(normalized_params)
     _, intakes = _validated_intakes(rows)
+    return analyze_intakes(intakes, period, threshold)
+
+
+def analyze_intakes(intakes, period, threshold):
+    """从月度归属序列生成公开表。原始明细与归档人数共用同一条计算路径。"""
     counts = {key: (0, 0) for key in product(CHANNELS, PROGRAMS)}
     for month, channel, program, converted in intakes:
         if month == period:

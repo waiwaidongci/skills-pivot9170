@@ -4,6 +4,7 @@ from sqlalchemy import and_, or_, select
 from src.config.database import Session
 from src.constants.enums import Status
 from src.domain.analysis import analyze
+from src.domain.archiving import analyze_archived
 from src.domain.spec import SPEC
 from src.models.jobs import Delivery, Run, Schedule
 from src.models.source import Dataset
@@ -40,6 +41,18 @@ def materialize_due():
                        name=item.name, params=params, author=item.author))
 
 
+def load_payload(dataset):
+    """读取批次的计算输入：原明细优先；已清除后用归档人数聚合重算。
+
+    返回 (来源标记, 数据)，两个入口最终共用同一条月度归属→报表计算路径。
+    """
+    if dataset.rows is not None:
+        return 'rows', dataset.rows
+    if dataset.archive_rows is None:
+        raise ValueError('该批次既无原始明细也无归档人数，无法计算。')
+    return 'archive', dataset.archive_rows
+
+
 def claim():
     stamp = now()
     with Session.begin() as db:
@@ -57,15 +70,18 @@ def claim():
         job.status = Status.RUNNING
         job.attempt += 1
         job.lease_until = stamp + timedelta(minutes=3)
-        records = db.get(Dataset, job.dataset_id).rows
-        return job.id, job.attempt, records, job.params
+        source, payload = load_payload(db.get(Dataset, job.dataset_id))
+        return job.id, job.attempt, source, payload, job.params
 
 
 def execute(lease):
-    job_id, attempt, rows, params = lease
+    job_id, attempt, source, payload, params = lease
     result = export = failure = None
     try:
-        result = analyze(rows, params)
+        if source == 'archive':
+            result = analyze_archived(payload, params)
+        else:
+            result = analyze(payload, params)
         export = write_report(job_id, attempt, result)
     except ValueError as error:
         failure = str(error)[:500]

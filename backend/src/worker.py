@@ -1,6 +1,7 @@
 import logging
 import time
 from pathlib import Path
+from src.services.archives import claim as claim_archive, materialize_waiting, switch
 from src.services.execution import claim, execute, materialize_due
 from src.utils.wakeup import wait
 
@@ -13,13 +14,17 @@ def main():
     while True:
         try:
             materialize_due()
+            materialize_waiting()
             lease = claim()
-            heartbeat.touch()
             if lease:
                 execute(lease)
-                heartbeat.touch()
             else:
-                wait()
+                archive_lease = claim_archive()
+                if archive_lease:
+                    switch(archive_lease)
+                else:
+                    wait()
+            heartbeat.touch()
         except Exception:
             log.exception('Worker cycle failed')
             time.sleep(2)

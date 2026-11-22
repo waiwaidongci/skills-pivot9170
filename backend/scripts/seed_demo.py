@@ -15,7 +15,13 @@ def seed():
         for role in Role:
             if not db.get(User, role.value):
                 db.add(User(username=role.value, role=role, password_hash=hash_password(f'{role.value}-demo-2611')))
-        item, created = save(db, SPEC['default_dataset'], SPEC['sample_name'], demo_rows(), 'seed')
+        try:
+            item, created = save(db, SPEC['default_dataset'], SPEC['sample_name'], demo_rows(), 'seed')
+        except ValueError:
+            # 演示批已归档清除：内容指纹禁止重导，播种视为无新增，保持幂等。
+            item = db.scalar(select(Dataset).where(Dataset.name == SPEC['default_dataset'])
+                             .order_by(Dataset.id).limit(1))
+            created = False
         return {'users': db.scalar(select(func.count()).select_from(User)),
                 'datasets': db.scalar(select(func.count()).select_from(Dataset)),
                 'seed_dataset_id': item.id, 'row_count': item.row_count, 'checksum': item.checksum,

@@ -44,7 +44,17 @@ def details(dataset_id: int, offset: int = Query(0, ge=0), limit: int = Query(16
     item = db.get(Dataset, dataset_id)
     if not item:
         raise HTTPException(404, '找不到该数据批次')
-    return {**views.dataset(item), 'rows': item.rows[offset:offset + limit]}
+    if item.rows is None:
+        # 已清除逐笔明细：页面展示月 × 渠道 × 项目的归档人数，不提供学员级数据。
+        archive_rows = item.archive_rows or []
+        return {**views.dataset(item), 'rows': archive_rows[offset:offset + limit],
+                'archive_mode': True,
+                'archive_columns': [{'key': 'period', 'label': '统计月份'},
+                                    {'key': 'channel', 'label': '招生渠道'},
+                                    {'key': 'program', 'label': '培训项目'},
+                                    {'key': 'intake_count', 'label': '去重受理人数'},
+                                    {'key': 'confirmed_count', 'label': '确认报名人数'}]}
+    return {**views.dataset(item), 'rows': item.rows[offset:offset + limit], 'archive_mode': False}
 
 
 @router.post('/datasets', status_code=201)
